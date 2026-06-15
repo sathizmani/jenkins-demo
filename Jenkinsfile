@@ -28,13 +28,24 @@ pipeline {
             }
         }
 
-        stage('Deploy to Docker') {
+       stage('Deploy to Docker') {
             steps {
                 echo 'Deploying application container on host machine...'
-                // This launches your compiled Java application in a brand new container on your Mac
                 sh '''
+                    # 1. Create a temporary folder on your Mac to hold the JAR
+                    mkdir -p /tmp/jenkins-demo-target
+                    
+                    # 2. Copy the compiled JAR out of Jenkins onto your Mac filesystem
+                    docker cp jenkins-local:/var/jenkins_home/workspace/java-demo/app/target/java-jenkins-demo-1.0-SNAPSHOT.jar /tmp/jenkins-demo-target/
+                    
+                    # 3. Remove any old app container if it exists
                     docker rm -f java-app-demo || true
-                    docker run -d --name java-app-demo eclipse-temurin:17-jre java -jar /var/jenkins_home/workspace/java-demo/app/target/java-jenkins-demo-1.0-SNAPSHOT.jar
+                    
+                    # 4. Run the container by mounting the Mac path (/tmp/jenkins-demo-target)
+                    docker run -d --name java-app-demo \
+                      -v /tmp/jenkins-demo-target:/apps \
+                      eclipse-temurin:17-jre \
+                      java -jar /apps/java-jenkins-demo-1.0-SNAPSHOT.jar
                 '''
             }
         }
