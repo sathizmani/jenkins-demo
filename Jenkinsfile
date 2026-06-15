@@ -4,7 +4,7 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                // This pulls the code down from your GitHub repository into the Jenkins workspace
+                // Pulls the code down from your GitHub repository into the active Jenkins workspace
                 checkout scm
             }
         }
@@ -22,31 +22,32 @@ pipeline {
             }
             post {
                 always {
-                    // This tells Jenkins to look for your JUnit XML test results and visualize them
+                    // Captures your JUnit XML test results and visualizes them in Jenkins
                     junit 'app/target/surefire-reports/*.xml'
                 }
             }
         }
 
-       stage('Deploy to Docker') {
+        stage('Deploy to Docker') {
             steps {
                 echo 'Deploying application container on host machine...'
-                sh '''
-                    # 1. Create a temporary folder on your Mac to hold the JAR
+                // Double quotes let Jenkins parse the dynamic ${WORKSPACE} variable flawlessly
+                sh """
+                    # 1. Create a clean temporary folder on your Mac filesystem
                     mkdir -p /tmp/jenkins-demo-target
                     
-                    # 2. Copy the compiled JAR out of Jenkins onto your Mac filesystem
-                    docker cp jenkins-local:/var/jenkins_home/workspace/java-demo/app/target/java-jenkins-demo-1.0-SNAPSHOT.jar /tmp/jenkins-demo-target/
+                    # 2. Extract the freshly compiled JAR from Jenkins to your Mac using the exact workspace path
+                    docker cp jenkins-local:${WORKSPACE}/app/target/java-jenkins-demo-1.0-SNAPSHOT.jar /tmp/jenkins-demo-target/
                     
-                    # 3. Remove any old app container if it exists
+                    # 3. Clean up any previous demo container if it exists
                     docker rm -f java-app-demo || true
                     
-                    # 4. Run the container by mounting the Mac path (/tmp/jenkins-demo-target)
+                    # 4. Spin up your dedicated, Mac-compatible Java runtime container
                     docker run -d --name java-app-demo \
                       -v /tmp/jenkins-demo-target:/apps \
                       eclipse-temurin:17-jre \
                       java -jar /apps/java-jenkins-demo-1.0-SNAPSHOT.jar
-                '''
+                """
             }
         }
     }
