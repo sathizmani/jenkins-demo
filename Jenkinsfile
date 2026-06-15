@@ -17,6 +17,9 @@ pipeline {
             steps {
                 echo 'Compiling Java Application and running JUnit tests...'
                 sh 'cd app && mvn clean test package'
+                
+                // 1. Tell Jenkins to save the JAR file before leaving this block
+                stash name: 'app-jar', includes: 'app/target/*.jar'
             }
             post {
                 always {
@@ -28,20 +31,21 @@ pipeline {
         stage('Deploy to Docker') {
             steps {
                 echo 'Deploying application container on host machine...'
+                
+                // 2. Bring the saved JAR into this stage's current workspace directory
+                unstash 'app-jar'
+                
                 sh '''
-                    # 1. Get the absolute path of where we are standing right now
-                    CURRENT_DIR=$(pwd)
-                    
-                    # 2. Create a clean temporary folder on your Mac
+                    # 3. Create a clean temporary folder on your Mac
                     mkdir -p /tmp/jenkins-demo-target
                     
-                    # 3. Copy the compiled JAR using the exact directory we just discovered
-                    docker cp jenkins-local:${CURRENT_DIR}/app/target/java-jenkins-demo-1.0-SNAPSHOT.jar /tmp/jenkins-demo-target/
+                    # 4. Copy the freshly unstashed JAR from the local workspace directory
+                    cp app/target/java-jenkins-demo-1.0-SNAPSHOT.jar /tmp/jenkins-demo-target/
                     
-                    # 4. Remove any old app container if it exists
+                    # 5. Clean up any previous demo container if it exists
                     docker rm -f java-app-demo || true
                     
-                    # 5. Spin up your dedicated, Mac-compatible Java runtime container
+                    # 6. Spin up your dedicated, Mac-compatible Java runtime container
                     docker run -d --name java-app-demo \
                       -v /tmp/jenkins-demo-target:/apps \
                       eclipse-temurin:17-jre \
