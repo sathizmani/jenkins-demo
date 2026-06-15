@@ -4,7 +4,6 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                // Pulls the code down from your GitHub repository into the active Jenkins workspace
                 checkout scm
             }
         }
@@ -17,34 +16,52 @@ pipeline {
             }
             steps {
                 echo 'Compiling Java Application and running JUnit tests...'
-                // Navigates into your app folder and runs the Maven build/test suite
                 sh 'cd app && mvn clean test package'
                 
-                // Safely stashes the compiled JAR file before leaving the isolated Maven container
+                // Securely stash the compiled JAR file for environment promotion
                 stash name: 'app-jar', includes: 'app/target/*.jar'
             }
             post {
                 always {
-                    // Captures your JUnit XML test results and visualizes them in Jenkins
                     junit 'app/target/surefire-reports/*.xml'
                 }
             }
         }
 
-        stage('Deploy to Docker') {
+        stage('Deploy to DEV') {
             steps {
-                echo 'Deploying application container on host machine...'
-                
-                // Unstashes the JAR into the base workspace directory (/var/jenkins_home/workspace/java-demo)
+                echo 'Deploying application container to DEV environment...'
                 unstash 'app-jar'
-                
                 sh '''
-                    # 1. Clean up any previous demo container if it exists
-                    docker rm -f java-app-demo || true
+                    # Clean up old DEV container if it exists
+                    docker rm -f java-app-dev || true
                     
-                    # 2. Spin up the container by mounting the global jenkins_home volume directly.
-                    # This maps the shared storage so both containers can access the exact same workspace files.
-                    docker run -d --name java-app-demo \
+                    # Spin up DEV container on a unique port if needed, or just unique name
+                    docker run -d --name java-app-dev \
+                      -v jenkins_home:/var/jenkins_home \
+                      eclipse-temurin:17-jre \
+                      java -jar /var/jenkins_home/workspace/java-demo/app/target/java-jenkins-demo-1.0-SNAPSHOT.jar
+                '''
+            }
+        }
+
+        stage('Promote Gateway (Approval)') {
+            steps {
+                // This completely pauses the pipeline UI and waits for user interaction
+                input message: 'Does the DEV deployment look healthy? Approve to promote to PROD.', ok: 'Release to Prod'
+            }
+        }
+
+        stage('Deploy to PROD') {
+            steps {
+                echo 'Deploying application container to PROD environment...'
+                unstash 'app-jar'
+                sh '''
+                    # Clean up old PROD container if it exists
+                    docker rm -f java-app-prod || true
+                    
+                    # Spin up the official PROD container using the exact same verified artifact
+                    docker run -d --name java-app-prod \
                       -v jenkins_home:/var/jenkins_home \
                       eclipse-temurin:17-jre \
                       java -jar /var/jenkins_home/workspace/java-demo/app/target/java-jenkins-demo-1.0-SNAPSHOT.jar
