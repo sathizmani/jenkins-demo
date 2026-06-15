@@ -4,6 +4,7 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
+                // Pulls the code down from your GitHub repository into the active Jenkins workspace
                 checkout scm
             }
         }
@@ -16,13 +17,15 @@ pipeline {
             }
             steps {
                 echo 'Compiling Java Application and running JUnit tests...'
+                // Navigates into your app folder and runs the Maven build/test suite
                 sh 'cd app && mvn clean test package'
                 
-                // 1. Tell Jenkins to save the JAR file before leaving this block
+                // Safely stashes the compiled JAR file before leaving the isolated Maven container
                 stash name: 'app-jar', includes: 'app/target/*.jar'
             }
             post {
                 always {
+                    // Captures your JUnit XML test results and visualizes them in Jenkins
                     junit 'app/target/surefire-reports/*.xml'
                 }
             }
@@ -32,24 +35,19 @@ pipeline {
             steps {
                 echo 'Deploying application container on host machine...'
                 
-                // 2. Bring the saved JAR into this stage's current workspace directory
+                // Unstashes the JAR into the base workspace directory (/var/jenkins_home/workspace/java-demo)
                 unstash 'app-jar'
                 
                 sh '''
-                    # 3. Create a clean temporary folder on your Mac
-                    mkdir -p /tmp/jenkins-demo-target
-                    
-                    # 4. Copy the freshly unstashed JAR from the local workspace directory
-                    cp app/target/java-jenkins-demo-1.0-SNAPSHOT.jar /tmp/jenkins-demo-target/
-                    
-                    # 5. Clean up any previous demo container if it exists
+                    # 1. Clean up any previous demo container if it exists
                     docker rm -f java-app-demo || true
                     
-                    # 6. Spin up your dedicated, Mac-compatible Java runtime container
+                    # 2. Spin up the container by mounting the global jenkins_home volume directly.
+                    # This maps the shared storage so both containers can access the exact same workspace files.
                     docker run -d --name java-app-demo \
-                      -v /tmp/jenkins-demo-target:/apps \
+                      -v jenkins_home:/var/jenkins_home \
                       eclipse-temurin:17-jre \
-                      java -jar /apps/java-jenkins-demo-1.0-SNAPSHOT.jar
+                      java -jar /var/jenkins_home/workspace/java-demo/app/target/java-jenkins-demo-1.0-SNAPSHOT.jar
                 '''
             }
         }
