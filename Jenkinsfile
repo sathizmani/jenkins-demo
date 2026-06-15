@@ -34,7 +34,7 @@ pipeline {
                 // This launches your compiled Java application in a brand new container on your Mac
                 sh '''
                     docker rm -f java-app-demo || true
-                    docker run -d --name java-app-demo eclipse-temurin:17-jre-alpine java -jar /var/jenkins_home/workspace/java-demo/app/target/java-jenkins-demo-1.0-SNAPSHOT.jar
+                    docker run -d --name java-app-demo eclipse-temurin:17-jre java -jar /var/jenkins_home/workspace/java-demo/app/target/java-jenkins-demo-1.0-SNAPSHOT.jar
                 '''
             }
         }
