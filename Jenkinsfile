@@ -18,7 +18,7 @@ pipeline {
                 echo 'Compiling Java Application and running JUnit tests...'
                 sh 'cd app && mvn clean test package'
                 
-                // Securely stash the compiled JAR file for environment promotion
+                // Securely stash the compiled JAR file for environment promotion test
                 stash name: 'app-jar', includes: 'app/target/*.jar'
             }
             post {
